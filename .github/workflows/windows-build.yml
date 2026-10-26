@@ -1,0 +1,81 @@
+name: Build Rust Office Windows x64 (portable)
+
+on:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - name: Install frontend dependencies
+        run: npm install --no-audit --no-fund
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Build static Next.js frontend
+        run: npm run build
+      - name: Validate Rust manifest
+        shell: pwsh
+        run: cargo metadata --manifest-path src-tauri/Cargo.toml --no-deps --format-version 1 > $null
+      - name: Check Rust backend
+        run: cargo check --manifest-path src-tauri/Cargo.toml
+      - name: Test Rust backend
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+      - name: Build portable Windows EXE
+        run: npm run tauri -- build --no-bundle
+      - name: Stage portable files and record SHA-256
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = 'src-tauri/target/release/rust-office-modern.exe'
+          if (!(Test-Path $exe)) { throw "EXE missing: $exe" }
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item $exe 'dist/RustOfficeModern.exe'
+          Copy-Item README.md 'dist/README.md'
+          $hash = (Get-FileHash 'dist/RustOfficeModern.exe' -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  RustOfficeModern.exe" | Set-Content -Path 'dist/SHA256SUMS.txt' -Encoding ascii
+          Write-Host "EXE SHA256: $hash"
+          $sig = Get-AuthenticodeSignature 'dist/RustOfficeModern.exe'
+          Write-Host "Authenticode status: $($sig.Status)"
+          if ($sig.Status -ne 'Valid') { Write-Warning 'Unsigned development build; this is NOT evidence of malware.' }
+      - name: Scan portable EXE with Microsoft Defender
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = (Resolve-Path 'dist/RustOfficeModern.exe').Path
+          if (!(Get-Command Start-MpScan -ErrorAction SilentlyContinue)) {
+            throw 'Microsoft Defender scanning cmdlets unavailable; refusing to publish unscanned artifact.'
+          }
+          Update-MpSignature -ErrorAction Stop
+          Start-MpScan -ScanType CustomScan -ScanPath $exe -ErrorAction Stop
+          $threats = @(Get-MpThreatDetection -ErrorAction Stop | Where-Object { $_.Resources -match 'RustOfficeModern.exe' })
+          if ($threats.Count -gt 0) { $threats | Format-List | Out-String | Write-Host; throw 'Defender detected a threat associated with EXE.' }
+          if (!(Test-Path $exe)) { throw 'EXE was removed or quarantined after scan.' }
+          Write-Host 'Defender scan completed without a matching reported detection.'
+      - name: Upload portable directory (GitHub produces one ZIP)
+        uses: actions/upload-artifact@v4
+        with:
+          name: RustOfficeModern-Windows-x64-portable
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30

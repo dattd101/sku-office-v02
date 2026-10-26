@@ -1,0 +1,11 @@
+{
+  "identifier": "default",
+  "description": "Default desktop permissions",
+  "windows": [
+    "main",
+    "editor-*"
+  ],
+  "permissions": [
+    "core:default"
+  ]
+}
