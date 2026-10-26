@@ -14,6 +14,7 @@ function RibbonButton({icon:Icon,label,onClick,disabled=false}:{icon:typeof File
 export default function Office(){
   const sessionId = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("session") : null;
   const [ready,setReady]=useState(false);
+  const [loadError,setLoadError]=useState('');
   const latest=useRef<{document:OfficeDocument;path:string|null;dirty:boolean}|null>(null);
   const savedRevision=useRef(0);
   const revision=useRef(0);
@@ -31,13 +32,13 @@ export default function Office(){
   const mode=doc.mode;
   latest.current={document:doc,path,dirty};
   useEffect(()=>{
-    if(!sessionId)return;
+    if(!sessionId){setLoadError('Missing session ID in editor URL.');return;}
     let active=true;
     invoke<DocumentSession>('get_session',{id:sessionId}).then(s=>{
       if(!active)return;
       setDoc(s.document);setPath(s.path);setDirty(s.dirty);setReady(true);
       setMessage(s.dirty?'Recovered unsaved changes from local snapshot':'Document ready');
-    }).catch(e=>setMessage(`Recovery failed: ${String(e)}`));
+    }).catch(e=>{if(active)setLoadError(`Cannot load document session: ${String(e)}`)});
     return()=>{active=false};
   },[sessionId]);
   useEffect(()=>{
@@ -84,6 +85,8 @@ export default function Office(){
   const formula=sheet?.cells[selectedCell]??'';
   const words=doc.word.trim()?doc.word.trim().split(/\s+/).length:0;
   const title=path?.split(/[\\/]/).pop()??`Untitled.${mode==='word'?'docx':mode==='excel'?'xlsx':'pptx'}`;
+  if(loadError)return <main style={{padding:32,fontFamily:'sans-serif'}}><h1>Unable to open editor</h1><p>{loadError}</p><button onClick={()=>void invoke('focus_manager')}>Return to Manager</button></main>;
+  if(!ready)return <main style={{padding:32,fontFamily:'sans-serif'}}><h1>Opening document…</h1><p>Loading local recovery session.</p></main>;
   return <div className={`app-shell mode-${mode} ${dark?'dark-app':''}`}>
     <header className="titlebar"><div className="brand"><span className="brand-mark"><Grid3X3 size={18}/></span><span>Rust<span className="brand-light">Office</span></span><span className="brand-pill">MODERN</span></div><div className="document-name">{title}{dirty?' •':''}</div><div className="title-actions"><span className="autosave"><Check size={14}/> Desktop workspace</span><button className="icon-button" title="Toggle dark mode" onClick={()=>setDark(!dark)}><Sparkles size={17}/></button></div></header>
     <div className="topbar"><div className="app-switcher"><button className="app-tab" onClick={()=>void invoke('focus_manager')}><Grid3X3 size={17}/> Manager</button><span className="app-tab active">{mode==='word'?'Word':mode==='excel'?'Excel':'PowerPoint'}</span></div><div className="quick-actions"><button onClick={newFile}><FilePlus2 size={16}/> New</button><button onClick={()=>void open()}><FolderOpen size={16}/> Open</button><button onClick={()=>void save()}><Save size={16}/> Save</button><button onClick={()=>void save(true)}><Download size={16}/> Save as</button><span className="vertical-rule"/><button className="square" title="Undo" disabled={!history.length} onClick={undo}><Undo2 size={17}/></button><button className="square" title="Redo" disabled={!future.length} onClick={redo}><Redo2 size={17}/></button></div></div>

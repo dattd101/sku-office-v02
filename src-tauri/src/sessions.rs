@@ -114,7 +114,7 @@ pub fn open_editor_window(app: AppHandle, id: String) -> Result<(), String> {
         return Ok(());
     }
     let title = match s.document.mode.as_str() { "word" => "Rust Word", "excel" => "Rust Excel", _ => "Rust PowerPoint" };
-    WebviewWindowBuilder::new(&app, &label, WebviewUrl::App(format!("index.html?view=editor&session={id}").into()))
+    WebviewWindowBuilder::new(&app, &label, WebviewUrl::App(format!("editor/?session={id}").into()))
         .title(title).inner_size(1440.0, 900.0).min_inner_size(950.0, 600.0)
         .build().map_err(|e|e.to_string())?;
     Ok(())
