@@ -38,6 +38,25 @@ The browser alone cannot access Tauri commands; use the desktop app to test mana
 
 ## GitHub Actions portable EXE
 
+### Download the EXE from Actions
+
+1. Push the updated source to `main` or `master`, or select the workflow and click **Run workflow**.
+2. Open the successful run (click its run title, not just the Actions list).
+3. In **Summary**, use **Download portable ZIP containing RustOfficeModern.exe**, or scroll to **Artifacts** and select **RustOfficeModern-Windows-x64-portable**.
+4. Extract the ZIP. It contains `RustOfficeModern.exe`, `README.md`, `SHA256SUMS.txt`, and `BUILD-INFO.json`.
+
+The summary link is added by the updated workflow and will appear on new runs only. Artifacts require GitHub sign-in and are retained for 30 days. If Chrome blocks the download, packaging alone does not resolve the security verdict; inspect the exact warning and build report. The workflow does not automatically obtain a signing certificate.
+
+To build and package locally on Windows:
+
+```powershell
+npm install
+npm run desktop:build
+npm run desktop:package
+```
+
+The packaged executable is `dist/RustOfficeModern.exe`. Microsoft Edge WebView2 Runtime must be installed on the destination computer.
+
 Push the project contents, including `.github/workflows/windows-build.yml`, to GitHub. Run **Build Rust Office v0.5 Windows x64** from the Actions tab. The workflow builds `src-tauri/target/release/rust-office-modern.exe` and publishes `RustOfficeModern-Windows-x64-portable.zip` as an artifact.
 
 The executable depends on Microsoft Edge WebView2 Runtime being available on Windows. `--no-bundle` does not create an installer.
