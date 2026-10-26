@@ -105,7 +105,9 @@ pub fn discard_session(app: AppHandle, id: String) -> Result<(), String> {
     Ok(())
 }
 #[tauri::command]
-pub fn open_editor_window(app: AppHandle, id: String) -> Result<(), String> {
+// Creating a WebView2 window from a synchronous command deadlocks on Windows.
+// Keep this command async so Tauri runs it outside the main UI thread.
+pub async fn open_editor_window(app: AppHandle, id: String) -> Result<(), String> {
     let s = get_session(app.clone(), id.clone())?;
     let label = format!("editor-{id}");
     if let Some(w) = app.get_webview_window(&label) {
