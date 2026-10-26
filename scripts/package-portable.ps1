@@ -9,7 +9,15 @@ New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
 $outputExe = Join-Path $outputDir 'RustOfficeModern.exe'
 Copy-Item -LiteralPath $sourceExe -Destination $outputExe -Force
 Copy-Item -LiteralPath (Join-Path $projectRoot 'README.md') -Destination (Join-Path $outputDir 'README.md') -Force
-$hash = (Get-FileHash -LiteralPath $outputExe -Algorithm SHA256).Hash.ToLowerInvariant()
+# Use .NET directly so packaging does not depend on Get-FileHash availability.
+$sha256 = [System.Security.Cryptography.SHA256]::Create()
+$stream = [System.IO.File]::OpenRead($outputExe)
+try {
+    $hash = [System.BitConverter]::ToString($sha256.ComputeHash($stream)).Replace('-', '').ToLowerInvariant()
+} finally {
+    $stream.Dispose()
+    $sha256.Dispose()
+}
 "$hash  RustOfficeModern.exe" | Set-Content -LiteralPath (Join-Path $outputDir 'SHA256SUMS.txt') -Encoding ascii
 $signature = Get-AuthenticodeSignature -LiteralPath $outputExe
 $report = [ordered]@{

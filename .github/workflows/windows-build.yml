@@ -45,7 +45,7 @@ jobs:
         run: npm run desktop:build
       - name: Stage portable files and record SHA-256
         shell: pwsh
-        run: npm run desktop:package
+        run: ./scripts/package-portable.ps1
       - name: Scan portable EXE with Microsoft Defender
         shell: pwsh
         run: |
